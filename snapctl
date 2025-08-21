@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-PATH="${ROOT}:$PATH"
+
+# автоподхват .env (если есть)
+if [ -f "$ROOT/config/.env" ]; then
+  set -a; . "$ROOT/config/.env"; set +a
+fi
 
 usage() {
   cat <<USAGE
@@ -9,32 +13,31 @@ Usage:
   ./snapctl <module> [--upload gist]
 
 Modules:
-  snap-lite        Быстрый лёгкий слепок
+  snap-lite          Быстрый лёгкий слепок
+  snap-os-deep       ОС: пакеты, пользователи/группы, sysctl, firewall, journal
+  snap-docker-deep   Docker/Compose: inspect, логи (48ч), events (72ч), сети
 
 Options:
-  --upload gist    Залить index.md и manifest.sha256 в приватный gist (нужен GH_TOKEN)
+  --upload gist      Залить index.md и manifest.sha256 в приватный gist (нужен GH_TOKEN)
 USAGE
 }
 
 main() {
   local module="${1:-}"; shift || true
+  local upload="${1:-}"; shift || true
   [ -z "${module}" ] && { usage; exit 2; }
 
-  local upload="${1:-}"; shift || true
-  case "${upload:-}" in
-    ""|--upload|--upload\ gist) ;;
-    *) echo "unknown option: ${upload}" >&2; usage; exit 2;;
-  esac
+  case "${upload:-}" in ""|--upload|--upload\ gist) ;; *) echo "unknown option: ${upload}" >&2; usage; exit 2;; esac
 
   case "${module}" in
-    snap-lite) MOD_SCRIPT="${ROOT}/modules/snap-lite.sh" ;;
-    *) echo "unknown module: ${module}" >&2; usage; exit 2;;
+    snap-lite)          MOD_SCRIPT="${ROOT}/modules/snap-lite.sh" ;;
+    snap-os-deep)       MOD_SCRIPT="${ROOT}/modules/snap-os-deep.sh" ;;
+    snap-docker-deep)   MOD_SCRIPT="${ROOT}/modules/snap-docker-deep.sh" ;;
+    *) echo "unknown module: ${module}"; usage; exit 2 ;;
   esac
   [ -x "${MOD_SCRIPT}" ] || { echo "missing module script: ${MOD_SCRIPT}"; exit 1; }
 
-  . "${ROOT}/lib/common.sh"
-  export SNAP_BASE="${SNAP_BASE:-/opt/somleng/snapshots}"
-  "${MOD_SCRIPT}"
+  SNAP_DIR="$("${MOD_SCRIPT}")"
 
   if [ "${upload:-}" = "--upload" ] || [ "${upload:-}" = "--upload gist" ]; then
     . "${ROOT}/lib/upload_gist.sh"
