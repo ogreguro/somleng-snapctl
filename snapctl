@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+PATH="${ROOT}:$PATH"
+
+usage() {
+  cat <<USAGE
+Usage:
+  ./snapctl <module> [--upload gist]
+
+Modules:
+  snap-lite        Быстрый лёгкий слепок
+
+Options:
+  --upload gist    Залить index.md и manifest.sha256 в приватный gist (нужен GH_TOKEN)
+USAGE
+}
+
+main() {
+  local module="${1:-}"; shift || true
+  [ -z "${module}" ] && { usage; exit 2; }
+
+  local upload="${1:-}"; shift || true
+  case "${upload:-}" in
+    ""|--upload|--upload\ gist) ;;
+    *) echo "unknown option: ${upload}" >&2; usage; exit 2;;
+  esac
+
+  case "${module}" in
+    snap-lite) MOD_SCRIPT="${ROOT}/modules/snap-lite.sh" ;;
+    *) echo "unknown module: ${module}" >&2; usage; exit 2;;
+  esac
+  [ -x "${MOD_SCRIPT}" ] || { echo "missing module script: ${MOD_SCRIPT}"; exit 1; }
+
+  . "${ROOT}/lib/common.sh"
+  export SNAP_BASE="${SNAP_BASE:-/opt/somleng/snapshots}"
+  "${MOD_SCRIPT}"
+
+  if [ "${upload:-}" = "--upload" ] || [ "${upload:-}" = "--upload gist" ]; then
+    . "${ROOT}/lib/upload_gist.sh"
+    if [ -z "${GH_TOKEN:-}" ]; then
+      echo "GH_TOKEN not set; skip gist upload"
+    else
+      echo "[*] Uploading metadata to gist..."
+      upload_gist || true
+    fi
+  fi
+
+  echo "[✓] Snapshot dir: ${SNAP_DIR}"
+  [ -f "${SNAP_DIR}/gist.url" ] && echo "[✓] Gist: $(cat "${SNAP_DIR}/gist.url")"
+}
+main "$@"

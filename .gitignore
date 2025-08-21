@@ -1,0 +1,6 @@
+# build artifacts
+snapshots/
+*.tar.gz
+*.log
+*.tmp
+*.response.json
