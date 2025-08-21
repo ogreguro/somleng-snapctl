@@ -6,30 +6,36 @@ SNAP_BASE="${SNAP_BASE:-/opt/somleng/snapshots}"
 ts_now() { date +%Y%m%d-%H%M%S; }
 
 require() { command -v "$1" >/dev/null 2>&1 || { echo "[-] missing: $1" >&2; return 1; }; }
-have()    { command -v "$1" >/dev/null 2>&1; }
+have() { command -v "$1" >/dev/null 2>&1; }
 
 mk_snap_dir() {
   local mod="${1:-unknown}"
   local ts; ts="$(ts_now)"
   SNAP_DIR="${SNAP_BASE}/${ts}"
   mkdir -p "${SNAP_DIR}"/{meta,docker,network,somleng,fs,core_dumps,logs}
+
   {
     echo "# Snapshot ${ts}"
     echo ""
     echo "- module: \`${mod}\`"
-    echo "- host: \`$(hostname -f 2>/dev/null || hostname)\`"
-    echo "- date(ISO): \`$(date -Is)\`"
-    echo "- kernel: \`$(uname -srmo)\`"
+    echo "- host: $(hostname -f 2>/dev/null || hostname)"
+    echo "- date(ISO): $(date -Is)"
+    echo "- kernel: $(uname -srmo)"
     echo ""
     echo "## Contents"
   } > "${SNAP_DIR}/index.md"
+
+  # Указатели на последний слепок
+  mkdir -p "${SNAP_BASE}"
+  ln -sfn "${SNAP_DIR}" "${SNAP_BASE}/last"
+  printf "%s\n" "${SNAP_DIR}" > "${SNAP_BASE}/LAST"
+
   echo "${SNAP_DIR}"
 }
 
 append_index_link() {
-  # usage: append_index_link <path> [label]
-  local path="$1"; local label="${2:-$1}"
-  printf -- "- [%s](%s)\n" "$label" "$path" >> "${SNAP_DIR}/index.md"
+  local label="${2:-$1}"
+  printf -- "- %s\n" "${label}" >> "${SNAP_DIR}/index.md"
 }
 
 save_cmd() {
@@ -37,7 +43,7 @@ save_cmd() {
   local out="${SNAP_DIR}/${rel}"
   mkdir -p "$(dirname "$out")"
   {
-    echo "\$ $*"
+    echo "$ $*"
     set +e
     "$@" 2>&1
     local rc=$?
@@ -59,7 +65,13 @@ save_file_copy() {
 }
 
 gen_manifest_sha256() {
-  ( cd "${SNAP_DIR}" && find . -maxdepth 6 -type f -print0 | sort -z | xargs -0 sha256sum ) > "${SNAP_DIR}/manifest.sha256" || true
+  if have sha256sum; then
+    ( cd "${SNAP_DIR}" && find . -maxdepth 6 -type f -print0 | sort -z | xargs -0 sha256sum ) > "${SNAP_DIR}/manifest.sha256" || true
+  elif have shasum; then
+    ( cd "${SNAP_DIR}" && find . -maxdepth 6 -type f -print0 | sort -z | xargs -0 shasum -a 256 ) > "${SNAP_DIR}/manifest.sha256" || true
+  else
+    echo "sha256 tool not found" > "${SNAP_DIR}/manifest.sha256"
+  fi
   append_index_link "manifest.sha256" "manifest.sha256"
 }
 
