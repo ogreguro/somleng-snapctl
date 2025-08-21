@@ -10,7 +10,6 @@ main() {
   if ! have docker; then
     echo "docker not installed" > "${SNAP_DIR}/docker/notice.txt"
     append_index_link docker/notice.txt docker/notice.txt
-    gen_manifest_sha256; finish_note; echo "${SNAP_DIR}"; exit 0
   fi
 
   save_cmd docker/version.txt docker version
@@ -40,6 +39,5 @@ main() {
 
   gen_manifest_sha256
   finish_note
-  echo "${SNAP_DIR}"
 }
 main "$@"

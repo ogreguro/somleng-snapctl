@@ -48,6 +48,5 @@ main() {
 
   gen_manifest_sha256
   finish_note
-  echo "${SNAP_DIR}"
 }
 main "$@"
